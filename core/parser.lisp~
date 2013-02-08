@@ -1,10 +1,8 @@
 ; parser.lisp - gobbles up code to be played with in Lisp Macros
-; *assumption: code being read in compiles (e.g. syntactically valid statements!). if there is serious errors (to define)
-; then tell the user, from the prespective of snarfing, what the problem is. But don't try to validate upfront
-; *I reserve the right to change the parsing technique - right now I am going to iteratively use regexp and stream
-; reading. If this is too much of a pain/boring.  I can use an open source or proprietary parsing engine.
-; for the moment this is fun enough! :) 
-
+; MAJOR ASSUMPTION: Code being read in compiles (e.g. syntactically valid statements!)
+; so we can assume that the code reads as though everything we see is a valid language element
+; unless something goes seriously wrong (TODO: we have to figure that out) 
+; 2. Creating an AST out of a blub language is not hard (logically) especially in Lisp! (This is the hope anyways)
 
 ;; For unit testing ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; cl-ppcre functions used by cl-lex:*allow-named-registers*, cl-ppcre:create-scanner, cl-ppcre:scan
