@@ -1,7 +1,22 @@
+; Two things I need to verify
+; 1. Is my theory of using nested p-lists correct?
+; 2. Does the "hierarchical" initial phases of the parser actually work
+
 
 ;;;; cl-ppcre semantics  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; For unit testing ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; cl-ppcre functions used by cl-lex:*allow-named-registers*, cl-ppcre:create-scanner, cl-ppcre:scan
+
+;; Basic unit test ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; SLIME compile file
+;; run (in-package :cl-rewriter)
+;      (ql:quickload "cl-ppcre") 
+;;  (tokenize-file *file-name* *code-path*)
+
+
 ;;  first pass: wordify the string = any non whitespace character
+;(ql:quickload "cl-ppcre")
 (split "\\s+" *test-string*)
 
 ;; second pass: for each wordification match against the following "grammar" 
@@ -22,9 +37,13 @@
 ;; <C++-Comment> = //<anycharacter-up-to-end-of-line>
 
 
-(defun (get-one-token statement)
-	""
-  ())
+(defun make-play-p-list ()
+  '(:a 1 :b 2))
+
+(defun make-play-p-list-nested ()
+  '(:pansy-pig-likes
+    (:mud a-lot
+     :splashing a-little)))
 
 ;;; Common Lisp Semantics ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
