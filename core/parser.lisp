@@ -15,13 +15,16 @@
 ;   Roll my own "Natural Language" Parser as per Kitchen Sink
 ;   FFI into some welll known C library used for parsing
 
+(ql:quickload "cl-ppcre")
 
 (defpackage :cl-rewriter
   (:use :common-lisp :cl-ppcre))
 
-;(in-package :cl-rewriter)
+(in-package :cl-rewriter)
 
 ;; tokenizer ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; data structure ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  
 (defun make-tokenization-precedence ()
   "return plist declaring tokenization precedence
@@ -52,7 +55,7 @@
      (:dot "(\\.)")
      (:pound "(\#)"))))
 
-(defglobal *tokenization-precedence* nil)
+(defvar *tokenization-precedence* nil)
 
 (setf *tokenization-precedence*
       (make-tokenization-precedence))
@@ -67,6 +70,8 @@
   "Right now primitive string comp, but maybe in the future might want to verify 
    whether this is a genuine pattern or not"
   (stringp obj))
+
+;;; functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun find-rule (name r)
   "traverses the hierarchy, returning the target"
@@ -91,13 +96,14 @@
          for i from 0  
          until (eq line 'eof)
          do (when (eq i ln)
-              (apply-rule-at-string r line))))))
+              (apply-rule-at-string r line)
+              (return))))))
 
 ; two versions 
 ; 1. "classic" recursion (using loop)
-; 2. corecursion (e.g. map, reduce, fold)
+; 2. "alternative" recursion called corecursion??? (e.g. map, reduce, fold)
 (defun apply-rule-at-string (r str)
-  (format t "Applying Rule ~A ~%" (rule-name r))
+  (format t "applying rule: ~A ~%" (rule-name r))
   (cond   
     ((null r) nil)
     ((is-pattern? r)
@@ -108,6 +114,12 @@
           (list (apply-rule-at-string sub-rule str))))))
           
 (defun break-apart-string (str &key based-on)
-  (format t "About to break-apart ~A with ~A ->" str based-on)
+  (format t "break-apart ~A with ~A ->" str based-on)
   (let ((matched-string (cl-ppcre:all-matches-as-strings based-on str)))
     (format t "-> ~A ~%" matched-string)))
+
+;TODO 1 sample-output:
+;apply-rule(:whitespace),"* -Redistribution of source code must retain the above copyright notice, this"
+;  :applying-pattern("//+s")
+;  -> result: "*" "-Redistribution" "of" "source" "code" "must"....
+; 2 Figure out accumulation strategy
