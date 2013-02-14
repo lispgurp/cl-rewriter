@@ -16,43 +16,19 @@
 ;   FFI into some welll known C library used for parsing
 
 
-;(defpackage :cl-rewriter)
-;  (:use :common-lisp :cl-ppcre))
+(defpackage :cl-rewriter
+  (:use :common-lisp :cl-ppcre))
 
 ;(in-package :cl-rewriter)
 
-;; Tokenizer ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; tokenizer ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  
-(defun tokenize-file (file-name path)
-  (let ((full-name (format nil "~A\\~A" path file-name)))
-	(with-open-file (s full-name)
-		  (tokenize-stream s))))
-
-(defun tokenize-stream (s) 
-  (loop for ln = (read-line s nil 'EOF)
-     counting n 
-	 until (eq ln 'EOF)
-	 collect (tokenize-line ln n)))
-
-
-;"all patterns are escaped first from the common lisp reader and then for the cl-ppcre parser"        
-; tokenization-precedence
-;   whitespace
-;   curly braces 
-;   parenthesis
-;   keywords TODO
-;   simple-multiple-character-groups TODO still:  == != >= <=
-;   simple-single-character-groups   TODO still:  >,<,! 
-;   
-
-;
-; plist declaring tokenization precedence
-; rule = (list <name> <content>)
-; content = (list <rule>*) | <string>
-; <name> = <keyword>
-; <keyword> = a lisp keyword
-; <string> = a lisp string
 (defun make-tokenization-precedence ()
+  "return plist declaring tokenization precedence
+   note - all patterns are escaped first from the common lisp reader and then for the cl-ppcre parser
+   rule := (list <key> <content>) | <pattern>
+   content := (list <rule>*)
+   pattern = cl-ppcre regexp string"
   '(:tokenization-precedence
     (:whitespace "\\s+")
     (:curly-braces 
@@ -76,37 +52,62 @@
      (:dot "(\\.)")
      (:pound "(\#)"))))
 
+(defglobal *tokenization-precedence* nil)
+
+(setf *tokenization-precedence*
+      (make-tokenization-precedence))
+
 (defun rule-name (rule)
   (first rule))
 
 (defun rule-content (rule)
   (rest rule))
 
+(defun is-pattern? (obj)
+  "Right now primitive string comp, but maybe in the future might want to verify 
+   whether this is a genuine pattern or not"
+  (stringp obj))
+
 (defun find-rule (name r)
   "traverses the hierarchy, returning the target"
   (cond   
-    ((or (stringp r) (null r)) nil)
+    ((or (is-pattern? r) (null r)) nil)
     ((eq (rule-name r) name) r)
     (t
-     (loop for kid in (rule-content r) 
+     (loop for rule in (rule-content r) 
         do 
-          (let ((result (find-rule name kid)))
+          (let ((result (find-rule name rule)))
             (when (not (null result))
               (return result)))))))
 
+(defun apply-rule-at-line (file rule-name ln)
+  (let ((r 
+         (find-rule 
+            rule-name 
+            *tokenization-precedence*)))
+    (with-open-file (s file)
+      (loop 
+         for line = (read-line s nil 'eof)
+         for i from 0  
+         until (eq line 'eof)
+         do (when (eq i ln)
+              (apply-rule-at-string r line))))))
 
-
-
-
-; want to be able to break apart string at each level of the hierarchy
-; and trace what the result will be (strikes me as a combinator/mapping 
-; operation of some sort) ???
-  
+; two versions 
+; 1. "classic" recursion (using loop)
+; 2. corecursion (e.g. map, reduce, fold)
+(defun apply-rule-at-string (r str)
+  (format t "Applying Rule ~A ~%" (rule-name r))
+  (cond   
+    ((null r) nil)
+    ((is-pattern? r)
+     (break-apart-string str :based-on r))
+    (t
+     (loop for sub-rule in (rule-content r) 
+        append
+          (list (apply-rule-at-string sub-rule str))))))
+          
 (defun break-apart-string (str &key based-on)
-  (format t "apply pattern ~A to ~A ~%" based-on str)
-  (let ((results (cl-ppcre:all-matches-as-strings based-on str)))
-    (format t "results ~S" results)
-    results))
-
-(defun tokenize-line (ln line-number)
-  (format t "LINE ~A IS ~A~%" line-number ln))
+  (format t "About to break-apart ~A with ~A ->" str based-on)
+  (let ((matched-string (cl-ppcre:all-matches-as-strings based-on str)))
+    (format t "-> ~A ~%" matched-string)))

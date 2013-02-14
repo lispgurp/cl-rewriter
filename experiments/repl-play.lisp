@@ -95,4 +95,16 @@
 	(loop for l = (read-line s nil 'EOF)
 		 until (eq l 'EOF)
 		 do (format t "~A ~%" l)))
+
+(setf tst-file "c:/Lisp/Thread.h")
+
+(defun counting-and-file-loop-semantics (path)
+  (with-open-file (s path)
+    (loop for l = (read-line s nil 'EOF)
+          for i from 0
+       until (eq l 'EOF)
+       do (format t "~A: ~A ~%" i l))))   
+
+
+
 					
