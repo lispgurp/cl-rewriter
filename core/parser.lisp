@@ -11,9 +11,10 @@
 ; reading. If this is too much of a pain/boring.  I can use an open source or proprietary parsing engine.
 ; for the moment this is fun enough! :). Some possibilities 
 ;   ANTLR/Clojure
-;   Proprietary "Kitchen Sink" implementor
+;   Proprietary "Kitchen Sink" implementor 
 ;   Roll my own "Natural Language" Parser as per Kitchen Sink
 ;   FFI into some welll known C library used for parsing
+;   FFI into .net or java binary that is easy to use 
 
 (ql:quickload "cl-ppcre")
 
@@ -71,19 +72,7 @@
    whether this is a genuine pattern or not"
   (stringp obj))
 
-;;; functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun find-rule (name r)
-  "traverses the hierarchy, returning the target"
-  (cond   
-    ((or (is-pattern? r) (null r)) nil)
-    ((eq (rule-name r) name) r)
-    (t
-     (loop for rule in (rule-content r) 
-        do 
-          (let ((result (find-rule name rule)))
-            (when (not (null result))
-              (return result)))))))
+;;; main functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun apply-rule-at-line (file rule-name ln)
   (let ((r 
@@ -99,11 +88,8 @@
               (apply-rule-at-string r line)
               (return))))))
 
-; two versions 
-; 1. "classic" recursion (using loop)
-; 2. "alternative" recursion called corecursion??? (e.g. map, reduce, fold)
 (defun apply-rule-at-string (r str)
-  (format t "applying rule: ~A ~%" (rule-name r))
+  (format t "applying rule(~A), ~A ~%" (rule-name r) str)
   (cond   
     ((null r) nil)
     ((is-pattern? r)
@@ -112,14 +98,31 @@
      (loop for sub-rule in (rule-content r) 
         append
           (list (apply-rule-at-string sub-rule str))))))
+
+; utilities
           
 (defun break-apart-string (str &key based-on)
-  (format t "break-apart ~A with ~A ->" str based-on)
-  (let ((matched-string (cl-ppcre:all-matches-as-strings based-on str)))
-    (format t "-> ~A ~%" matched-string)))
+  (format t "  :applying-pattern(~A)~%" based-on)
+  (let ((results 
+         (cl-ppcre:all-matches-as-strings based-on str)))
+    (format t "  -> ~A ~%" (into-single-str results))))
 
-;TODO 1 sample-output:
-;apply-rule(:whitespace),"* -Redistribution of source code must retain the above copyright notice, this"
-;  :applying-pattern("//+s")
-;  -> result: "*" "-Redistribution" "of" "source" "code" "must"....
-; 2 Figure out accumulation strategy
+(defun into-single-str (lst-of-strs)
+  (reduce #'(lambda (l r) 
+              (concatenate 'string l r))
+          lst-of-strs))
+
+(defun find-rule (name r)
+  "traverses the hierarchy, returning the target"
+  (cond   
+    ((or (is-pattern? r) (null r)) nil)
+    ((eq (rule-name r) name) r)
+    (t
+     (loop for rule in (rule-content r) 
+        do 
+          (let ((result (find-rule name rule)))
+            (when (not (null result))
+              (return result)))))))
+
+
+  
