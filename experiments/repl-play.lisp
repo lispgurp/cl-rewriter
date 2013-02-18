@@ -105,6 +105,15 @@
        until (eq l 'EOF)
        do (format t "~A: ~A ~%" i l))))   
 
+(defun cond-semantics (tst-val)
+  (cond ((eq tst-val 'first-tst)
+         (format t "we have hit the first test"))
+        ((eq tst-val 'second-tst)
+         (format t "we have hit the second test"))
+        ((eq tst-val 'third-tst)
+         (format t "we have hit the third test"))))
 
+(defun try-optional-keyword (&key (a-kwd-arg 'default-value))
+  (format t "This is was what passed in: ~A" a-kwd-arg))
 
 					

@@ -10,18 +10,6 @@
             (when (not (null result))
               (return result)))))))
 
-(defun find-rule2 (name r)
-  (recur-rule 
-   name
-   r
-   :pattern-fn #'(lambda (rule) nil) 
-   :name-fn #'(lambda (rule) (rule))
-   :child-fn #'(lambda (rule)
-                 (let ((result (find-rule2 name rule)))
-                   (when (not (null result))
-                     (return-from find-rule2 result))))
-                 ))
-
 (defun apply-rule-at-string (r str)
   (format t "applying rule(~A), ~A ~%" (rule-name r) str)
   (cond   
@@ -33,7 +21,19 @@
         append
           (list (apply-rule-at-string sub-rule str))))))
 
-(defun apply-rule-to-string (name r str )
+(defun find-rule2 (name r)
+  (recur-rule 
+   name
+   r
+   :pattern-fn #'(lambda (rule) nil) 
+   :name-fn #'(lambda (rule) (rule))
+   :child-fn #'(lambda (rule)
+                 (let ((result (find-rule2 name rule)))
+                   (when (not (null result))
+                     (return-from find-rule2 result))))
+   :child-iter 'do))
+
+(defun apply-rule-to-string (name r str)
   (format t "applying rule(~A), ~A ~%" (rule-name r) str)
   (recur-rule
    name
@@ -44,21 +44,21 @@
                      results))
    :name-fn #'(lambda (rule) nil)
    :child-fn #'(lambda (rule)
-                 (apply-rule-to-string name rule str))))
+                 (list apply-rule-to-string name rule str))
+   :child-iter 'append))
 
-
-(defun recur-rule (name r &key pattern-fn name-fn child-fn)
+(defun recur-rule (name r &key pattern-fn name-fn child-fn child-iter)
   (cond
     ((null r) nil)
     ((is-pattern? r)
      (funcall pattern-fn r))
     ((eq (rule-name r) name)
      (funcall name-fn r))
-    (t
+    ((eq child-iter-type 'do)
      (loop for rule in (rule-content r)
-          do (funcall child-fn r)))))
-          
-;TODO
-; Is return-from doing, what I think it is doing???
-; new method - apply-hierarchy to string           
+        do (funcall child-fn r)))
+    ((eq child-iter-type 'append)
+     (loop for rule in (rule-content r)
+        append (funcall child-fn r)))))
+             
          

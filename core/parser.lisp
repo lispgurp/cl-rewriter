@@ -25,7 +25,7 @@
 
 ;; tokenizer ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; data structure ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; data structure 
  
 (defun make-tokenization-precedence ()
   "return plist declaring tokenization precedence
@@ -61,6 +61,8 @@
 (setf *tokenization-precedence*
       (make-tokenization-precedence))
 
+; data structure accessors
+
 (defun rule-name (rule)
   (first rule))
 
@@ -69,37 +71,67 @@
 
 (defun is-pattern? (obj)
   "Right now primitive string comp, but maybe in the future might want to verify 
-   whether this is a genuine pattern or not"
+   whether this is a genuine pattern or not via cl-ppcre utility"
   (stringp obj))
 
-;;; main functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; main functions 
 
-(defun apply-rule-at-line (file rule-name ln)
+(defun apply-rule-to-line (rule-name ln file-path)
   (let ((r 
          (find-rule 
             rule-name 
             *tokenization-precedence*)))
-    (with-open-file (s file)
+    (with-open-file (s file-path)
       (loop 
          for line = (read-line s nil 'eof)
          for i from 0  
          until (eq line 'eof)
          do (when (eq i ln)
-              (apply-rule-at-string r line)
+              (apply-rule-to-string (rule-name r) r line)
               (return))))))
+ 
+;(find-rule :open-curly *tokenization-precedence*) 
+(defun find-rule (name r)
+  (recur-rule 
+   name
+   r
+   :pattern-fn #'(lambda (rule) nil) 
+   :name-fn #'(lambda (rule) rule)
+   :child-fn #'(lambda (rule)
+                 (let ((result (find-rule name rule)))
+                   (when (not (null result))
+                     (return-from find-rule result))))
+   :child-iter 'do))
 
-(defun apply-rule-at-string (r str)
+(defun apply-rule-to-string (name r str)
   (format t "applying rule(~A), ~A ~%" (rule-name r) str)
-  (cond   
+  (recur-rule
+   name
+   r
+   :pattern-fn #'(lambda (rule)
+                   (let ((results
+                          (break-apart-string str :based-on rule)))
+                     results))
+   :name-fn #'(lambda (rule) nil)
+   :child-fn #'(lambda (rule)
+                 (list (apply-rule-to-string name rule str)))
+   :child-iter 'append))
+
+(defun recur-rule (name r &key pattern-fn name-fn child-fn child-iter)
+  (cond
     ((null r) nil)
     ((is-pattern? r)
-     (break-apart-string str :based-on r))
-    (t
-     (loop for sub-rule in (rule-content r) 
-        append
-          (list (apply-rule-at-string sub-rule str))))))
-
-; utilities
+     (funcall pattern-fn r))
+    ((eq (rule-name r) name)
+     (funcall name-fn r))
+    ((eq child-iter 'do)
+     (loop for rule in (rule-content r)
+        do (funcall child-fn rule)))
+    ((eq child-iter 'append)
+     (loop for rule in (rule-content r)
+        append (funcall child-fn rule)))))
+             
+; main function utils
           
 (defun break-apart-string (str &key based-on)
   (format t "  :applying-pattern(~A)~%" based-on)
@@ -112,17 +144,6 @@
               (concatenate 'string l r))
           lst-of-strs))
 
-(defun find-rule (name r)
-  "traverses the hierarchy, returning the target"
-  (cond   
-    ((or (is-pattern? r) (null r)) nil)
-    ((eq (rule-name r) name) r)
-    (t
-     (loop for rule in (rule-content r) 
-        do 
-          (let ((result (find-rule name rule)))
-            (when (not (null result))
-              (return result)))))))
 
 
   
