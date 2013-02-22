@@ -97,7 +97,7 @@
       (progn
         (funcall complex-rule-fn r)
         (loop for ele in (rule-content r)
-           append (funcall rule-iter-fn ele)))))
+           do (funcall rule-iter-fn ele)))))
 
 (defun find-rule (name r)
   (recur-rule
@@ -115,24 +115,33 @@
    ))
 
 (defun apply-rule-to-string (r str)
-  (recur-rule
+  (reduce-rule-on-value
    r
-   :pattern-rule-fn #'(lambda (rule)
+   (list str)
+   :pattern-rule-fn #'(lambda (rule acc)
                         (apply-pattern-to-string (rule-pattern rule) 
-                                                 str
-                                                 (rule-name rule)))
-   :complex-rule-fn #'(lambda (rule) nil)
-   :rule-iter-fn #'(lambda (rule)
-                     (apply-rule-to-string rule str))))
+                                                 acc))
+   ))
 
+(defun reduce-rule-on-value (r acc &key pattern-rule-fn)
+  (let ((result
+         (if (is-pattern-rule? r)
+             (funcall pattern-rule-fn r acc))))
+      (progn
+        (loop for ele in (rule-content r)
+             do (reduce-rule-on-value 
+                 ele 
+                 (if (null result) acc result)  
+                 :pattern-rule-fn pattern-rule-fn)))))
+      
 ; utils    
-(defun apply-pattern-to-string (patt str rule-name)
-  (format t "Applying \"~A\" to string \"~A\" ~%" patt str)
-  (let ((results 
-         (cl-ppcre:split patt str 
-                         :with-registers-p t
-                         :omit-unmatched-p t)))
-    (format t "Results: ~S~%" results)
-    results))
+(defun apply-pattern-to-string (patt list-strs)  
+  (mapcar #'(lambda (str)
+              (cl-ppcre:split patt str 
+                              :with-registers-p t
+                              :omit-unmatched-p t))
+          list-strs))
+  
+    
     
 
