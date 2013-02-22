@@ -1,3 +1,5 @@
+;;; rule tree traversal experimentation ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defun find-rule (name r)
   "traverses the hierarchy, returning the target"
   (cond   
@@ -61,4 +63,3 @@
      (loop for rule in (rule-content r)
         append (funcall child-fn r)))))
              
-         

@@ -116,4 +116,17 @@
 (defun try-optional-keyword (&key (a-kwd-arg 'default-value))
   (format t "This is was what passed in: ~A" a-kwd-arg))
 
+; reduce semantics
+(defun into-single-str (lst-of-strs)
+  (reduce #'(lambda (l r) 
+              (concatenate 'string l r))
+          lst-of-strs))
+
+(defun test-if-semantics (x)
+  "no else in this case"
+  (if (eq x 1) (format t "we have one")))
+
+(defun test-when-semantics (x)
+  (when (eq x 1)
+    (format t "we have one")))
 					

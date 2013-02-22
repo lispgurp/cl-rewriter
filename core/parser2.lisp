@@ -32,8 +32,9 @@
 (defun make-tokenization-precedence ()
   "return plist declaring tokenization precedence
    rule := (list <rule-name> <rule-content>)
-   rule-content := (list <rule>) | <pattern> 
-   pattern := (list <key> <string>)"
+   rule-content := <complex-rule> | <pattern-rule> 
+   <complex-rule> := rule
+   <pattern-rule> := (list <key> <string>)"
   '(:tokenization-precedence
     (:whitespace "\\s+")
     (:curly-braces 
@@ -41,7 +42,7 @@
      (:closed-curly "(})"))
     (:parenthesis 
      (:open-paren "(\()")
-     (:closed-paren "(\))"))
+     (:closed-paren "(\\))"))
     (:simple-multiple-character-groups
      (:arrow-derference "(->)")
      (:open-comment "(\\'*')")
@@ -62,30 +63,23 @@
 (setf *tp*
       (make-tokenization-precedence))
 
-; data structure accessors
-
 (defun rule-name (rule)
   (first rule))
 
 (defun rule-content (rule)
   (rest rule))
 
-(defun is-pattern? (obj)
+(defun rule-pattern (pattern-rule)
+  (second pattern-rule))
+
+(defun is-pattern-rule? (obj)
   "Right now primitive string comp, but maybe in the future might want to verify 
    whether this is a genuine pattern or not via cl-ppcre utility"
   (and (listp obj)
        (keywordp (first obj))
-       (stringp  (second obj))))
+       (stringp (first (rest obj)))))
 
-(defun is-rule? (obj)
-  (and (listp obj)
-       (keywordp (first obj))
-       (listp (second obj))))
-
-(defun rule-pattern (obj)
-  (second obj))
-
-; main functions 
+; core tokenization functions
 
 (defun apply-rule-to-line (name-of-rule ln file-path)
   (let ((r (find-rule name-of-rule *tp*)))
@@ -95,56 +89,50 @@
          for i from 1
          until (eq line 'eof)
          do (when (eq i ln)
-              (apply-rule-to-string r line)
-              (return))))))
- 
-(defun find-rule (name r)
-  (recur-rule 
-   r
-   :child-fn #'(lambda (rule)
-                   (if (eq (rule-name rule) name) rule nil))
-   :pattern-fn #'(lambda (rule) 
-                   (if (eq (rule-name rule) name) rule nil))
-   :recur-fn #'(lambda (rule)
-                 (let ((result (find-rule name rule)))
-                   (when (not (null result))
-                     (return-from find-rule result))))
-   :iter-type 'do))
+              (return (apply-rule-to-string r line)))))))
 
-(defun apply-rule-to-string (r str)
-  (format t "applying rule(~A), ~A ~%" (rule-name r) str)
+(defun recur-rule (r &key pattern-rule-fn complex-rule-fn rule-iter-fn)
+  (if (is-pattern-rule? r)
+      (funcall pattern-rule-fn r)
+      (progn
+        (funcall complex-rule-fn r)
+        (loop for ele in (rule-content r)
+           append (funcall rule-iter-fn ele)))))
+
+(defun find-rule (name r)
   (recur-rule
    r
-   :pattern-fn #'(lambda (rule)
-                   (break-apart-string str :based-on (rule-pattern rule)))
-   :recur-fn #'(lambda (rule)
-                 (list (apply-rule-to-string rule str)))
-   :iter-type 'append))
+   :pattern-rule-fn #'(lambda (rule)
+                        (when (eq (rule-name rule) name)
+                          (return-from find-rule rule)))
+   :complex-rule-fn #'(lambda (rule)
+                        (when (eq (rule-name rule)  name)
+                          (return-from find-rule rule)))
+   :rule-iter-fn #'(lambda (ith-rule)
+                     (let ((result (find-rule name ith-rule)))
+                       (when (not (null result))
+                         (return-from find-rule result))))
+   ))
 
-(defun recur-rule (r &key child-fn pattern-fn recur-fn iter-type)
-  (cond
-    ((is-pattern? r)
-     (funcall pattern-fn r))
-    ((is-composite-rule? r)
-     (process-child-rules r child-fn recur-fn iter-type))))
+(defun apply-rule-to-string (r str)
+  (recur-rule
+   r
+   :pattern-rule-fn #'(lambda (rule)
+                        (apply-pattern-to-string (rule-pattern rule) 
+                                                 str
+                                                 (rule-name rule)))
+   :complex-rule-fn #'(lambda (rule) nil)
+   :rule-iter-fn #'(lambda (rule)
+                     (apply-rule-to-string rule str))))
 
-; want it in both cases
-(defun process-child-rules (r child-fn recur-fn iter-type)
-  (when (not (null child-fn))
-      (funcall child-fn r))
-  (cond ((eq iter-type 'do)
-         (loop for rule in (rule-content r)
-            do (funcall recur-fn rule)))
-        ((eq iter-type 'append)
-         (loop for rule in (rule-content r)
-            append (funcall recur-fn rule)))))
-             
-; main function utils
-          
-(defun break-apart-string (str &key based-on)
-  (format t "  :applying-pattern(~A)~%" based-on)
+; utils    
+(defun apply-pattern-to-string (patt str rule-name)
+  (format t "Applying \"~A\" to string \"~A\" ~%" patt str)
   (let ((results 
-         (cl-ppcre:split based-on str)))
-    (format t "  -> ~S ~%" results)
+         (cl-ppcre:split patt str 
+                         :with-registers-p t
+                         :omit-unmatched-p t)))
+    (format t "Results: ~S~%" results)
     results))
+    
 
