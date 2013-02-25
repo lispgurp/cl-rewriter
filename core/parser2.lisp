@@ -5,7 +5,7 @@
 ; context.
 ;
 ; *assumption: code being read in compiles (e.g. syntactically valid statements!). if there is serious errors (to define)
-; then tell the user, from the prespective of snarfing, what the problem is. But don't try to validate upfront
+; then tell the user, from the prespective of snarfing, what the problem is. But don't try to validate upfront)
 ;
 ; *I reserve the right to change the parsing technique - right now I am going to iteratively use regexp and stream
 ; reading. If this is too much of a pain/boring.  I can use an open source or proprietary parsing engine.
@@ -26,7 +26,7 @@
 
 ;; tokenizer ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; data structure 
+; data structure  ;;;
  
 ; note - all patterns are escaped first from the common lisp reader and then for the cl-ppcre parser
 (defun make-tokenization-precedence ()
@@ -38,10 +38,10 @@
   '(:tokenization-precedence
     (:whitespace "\\s+")
     (:curly-braces 
-     (:open-curly "({)")
-     (:closed-curly "(})"))
+     (:open-curly "(\{)")
+     (:closed-curly "(\})"))
     (:parenthesis 
-     (:open-paren "(\()")
+     (:open-paren "(\\()")
      (:closed-paren "(\\))"))
     (:simple-multiple-character-groups
      (:arrow-derference "(->)")
@@ -79,7 +79,7 @@
        (keywordp (first obj))
        (stringp (first (rest obj)))))
 
-; core tokenization functions
+; core tokenization functions ;;;
 
 (defun apply-rule-to-line (name-of-rule ln file-path)
   (let ((r (find-rule name-of-rule *tp*)))
@@ -90,14 +90,6 @@
          until (eq line 'eof)
          do (when (eq i ln)
               (return (apply-rule-to-string r line)))))))
-
-(defun recur-rule (r &key pattern-rule-fn complex-rule-fn rule-iter-fn)
-  (if (is-pattern-rule? r)
-      (funcall pattern-rule-fn r)
-      (progn
-        (funcall complex-rule-fn r)
-        (loop for ele in (rule-content r)
-           do (funcall rule-iter-fn ele)))))
 
 (defun find-rule (name r)
   (recur-rule
@@ -115,33 +107,47 @@
    ))
 
 (defun apply-rule-to-string (r str)
-  (reduce-rule-on-value
-   r
-   (list str)
-   :pattern-rule-fn #'(lambda (rule acc)
-                        (apply-pattern-to-string (rule-pattern rule) 
-                                                 acc))
-   ))
+  (setf *rule-acc* (list str))
+  (setf *rule-acc* (recur-rule-to-strings r *rule-acc*))
+  *rule-acc*)
 
-(defun reduce-rule-on-value (r acc &key pattern-rule-fn)
-  (let ((result
-         (if (is-pattern-rule? r)
-             (funcall pattern-rule-fn r acc))))
-      (progn
-        (loop for ele in (rule-content r)
-             do (reduce-rule-on-value 
-                 ele 
-                 (if (null result) acc result)  
-                 :pattern-rule-fn pattern-rule-fn)))))
+(defun recur-rule-to-strings (r strs)
+  (recur-rule
+   r 
+   :pattern-rule-fn #'(lambda (rule)
+                        (apply-pattern-to-strings
+                               (rule-pattern rule)
+                               *rule-acc*))
+   :complex-rule-fn #'identity
+   :rule-iter-fn #'(lambda (ith-rule)
+                     (setf *rule-acc* 
+                           (recur-rule-to-strings ith-rule *rule-acc*)))))
       
-; utils    
-(defun apply-pattern-to-string (patt list-strs)  
-  (mapcar #'(lambda (str)
-              (cl-ppcre:split patt str 
+; utils ;;;
+
+; global accumulator for recur-rule, to be reset at every user level call
+; (e.g. see apply-rule-to-string, recur-rule-to-strings)
+(defvar *rule-acc*)
+
+; rule traversal
+(defun recur-rule (r &key pattern-rule-fn complex-rule-fn rule-iter-fn)
+  (if (is-pattern-rule? r)
+      (funcall pattern-rule-fn r)
+      (progn
+        (funcall complex-rule-fn r)
+        (loop for ele in (rule-content r)
+           do (funcall rule-iter-fn ele)))))
+
+
+; pattern matching
+(defun apply-pattern-to-strings (patt strs)  
+  (let ((result (mapcar #'(lambda (str)
+                           (cl-ppcre:split patt str 
                               :with-registers-p t
                               :omit-unmatched-p t))
-          list-strs))
-  
-    
-    
-
+                        strs)))
+    (reduce #'(lambda (l r)
+                (append l r))
+            result)))
+                
+              

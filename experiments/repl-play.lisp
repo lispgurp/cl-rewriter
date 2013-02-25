@@ -122,6 +122,11 @@
               (concatenate 'string l r))
           lst-of-strs))
 
+(defun splice-lsts (lst-of-lst)
+  (reduce #'(lambda (l r)
+              (append l r))
+          lst-of-lst))
+
 (defun test-if-semantics (x)
   "no else in this case"
   (if (eq x 1) (format t "we have one")))
@@ -129,4 +134,5 @@
 (defun test-when-semantics (x)
   (when (eq x 1)
     (format t "we have one")))
+
 					
