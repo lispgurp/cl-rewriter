@@ -24,13 +24,13 @@
 
 ;(in-package :cl-rewriter)
 
-;; tokenizer ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; tokenizer ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; data structure  ;;;
+;;; tokenizer rules data structure  ;;;
  
-; note - all patterns are escaped first from the common lisp reader and then for the cl-ppcre parser
 (defun make-tokenization-precedence ()
-  "return plist declaring tokenization precedence
+  "note - all patterns are escaped first from the common lisp reader and then for the cl-ppcre parser
+   return plist declaring tokenization precedence
    rule := (list <rule-name> <rule-content>)
    rule-content := <complex-rule> | <pattern-rule> 
    <complex-rule> := rule
@@ -58,6 +58,9 @@
      (:dot "(\\.)")
      (:pound "(\#)"))))
 
+; global accumulator for recur-rule, intended to be used in the closures passed into recur-rule
+(defvar *results*)
+
 (defvar *tp* nil)
 
 (setf *tp*
@@ -79,7 +82,7 @@
        (keywordp (first obj))
        (stringp (first (rest obj)))))
 
-; core tokenization functions ;;;
+; tokenization rules processor ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun apply-rule-to-line (name-of-rule ln file-path)
   (let ((r (find-rule name-of-rule *tp*)))
@@ -107,29 +110,22 @@
    ))
 
 (defun apply-rule-to-string (r str)
-  (setf *rule-acc* (list str))
-  (setf *rule-acc* (recur-rule-to-strings r *rule-acc*))
-  *rule-acc*)
+  (setf *results* (list str))
+  (setf *results* (recur-rule-to-matches r *results*))
+  *results*)
 
-(defun recur-rule-to-strings (r strs)
+(defun recur-rule-to-matches (r matches)
   (recur-rule
    r 
    :pattern-rule-fn #'(lambda (rule)
-                        (apply-pattern-to-strings
-                               (rule-pattern rule)
-                               *rule-acc*))
+                        (apply-pattern-to-matches (rule-name rule)
+                                                  (rule-pattern rule)
+                                                  *results*))
    :complex-rule-fn #'identity
    :rule-iter-fn #'(lambda (ith-rule)
-                     (setf *rule-acc* 
-                           (recur-rule-to-strings ith-rule *rule-acc*)))))
-      
-; utils ;;;
+                     (setf *results*
+                           (recur-rule-to-matches ith-rule *results*)))))    
 
-; global accumulator for recur-rule, to be reset at every user level call
-; (e.g. see apply-rule-to-string, recur-rule-to-strings)
-(defvar *rule-acc*)
-
-; rule traversal
 (defun recur-rule (r &key pattern-rule-fn complex-rule-fn rule-iter-fn)
   (if (is-pattern-rule? r)
       (funcall pattern-rule-fn r)
@@ -138,16 +134,40 @@
         (loop for ele in (rule-content r)
            do (funcall rule-iter-fn ele)))))
 
+;;; pattern matching ;;;
+; matches := (list <match>)
+; match := <unmatched> | <matched> 
+; matched :=  (:keyword string)
+; unmatched := string
+(defun is-unmatched? (obj)
+  (stringp obj))
 
-; pattern matching
-(defun apply-pattern-to-strings (patt strs)  
-  (let ((result (mapcar #'(lambda (str)
-                           (cl-ppcre:split patt str 
-                              :with-registers-p t
-                              :omit-unmatched-p t))
-                        strs)))
-    (reduce #'(lambda (l r)
-                (append l r))
-            result)))
-                
+(defun is-matched? (obj)
+  (and (listp obj)
+       (keywordp (first obj))
+       (stringp (first (rest obj)))))
+
+(defun apply-pattern-to-matches (name patt matches)  
+  (let ((results (mapcar #'(lambda (match)
+                             (cond ((is-unmatched? match) 
+                                    (apply-pattern-to-match name patt match))
+                                   ((is-matched? match) match)))
+                         matches)))
+    results))
+
+(defun apply-pattern-to-match (name patt unmatched)
+  (let ((results (cl-ppcre:split patt unmatched
+                                 :with-registers-p t
+                                 :omit-unmatched-p t))
+        (result-idxes (cl-ppcre:all-matches patt unmatched))
+        (matches-count '("TODO")))
+    (list name (values results result-idxes))))
+
+(defun replace-in (strs target replacement count)
+  (loop for str in strs
+       append (if (eq str target)
+                  replacement
+                  str)))
+
+
               
