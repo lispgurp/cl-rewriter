@@ -2,7 +2,7 @@
 ; The idea is that noisy blub code (even if it is well factored) 
 ; is much easier to grok and refactor inside a interactive reprogrammable environment like a REPL 
 ; instead of the traditional "manual" ways that developers try to understand/refactor code in a blub 
-; context.
+; context (e.g. even with refactoring tools)
 ;
 ; *assumption: code being read in compiles (e.g. syntactically valid statements!). if there is serious errors (to define)
 ; then tell the user, from the prespective of snarfing, what the problem is. But don't try to validate upfront)
@@ -11,11 +11,11 @@
 ; reading. If this is too much of a pain/boring.  I can use an open source or proprietary parsing engine.
 ; for the moment this is fun enough! :). Some possibilities 
 ;   Proprietary "Kitchen Sink" implementor 
-;   Roll my own "Natural Language" Parser as per Kitchen Sink
+;   Roll my own "Natural Language" Style Parser as per Kitchen Sink
 ;   FFI/Interop with  
 ;       1. some welll known C library used for parsing (lexx/yacc)
-;       2. easy to use .net library F# (Irony)
-;       3. easy to use java library Clojure (ANTLR)
+;       2. easy to use .net library via F# (Irony)
+;       3. easy to use java library via Clojure (ANTLR)
 
 (ql:quickload "cl-ppcre")
 
@@ -160,8 +160,8 @@
                                  :with-registers-p t
                                  :omit-unmatched-p t))
         (result-idxes (cl-ppcre:all-matches patt unmatched))
-        (matches-count '("TODO")))
-    (list name (values results result-idxes))))
+        (idxes-pair (pair-up-substring-idxes result-idxes)))
+    (list name (values results result-idxes idxes-pair))))
 
 (defun replace-in (strs target replacement count)
   (loop for str in strs
@@ -169,5 +169,26 @@
                   replacement
                   str)))
 
+(defun map-pair (fn lst)
+  "rudimentary mapping function that iterates through pairs
+   of elements and applys a function for every pair of elements"
+  (cond ((null lst) nil)
+        ((eq (length lst) 1)  ; if the list as an odd number of elements
+         (funcall fn (list (first lst) nil)))
+        (t
+         (cons
+          (funcall fn (list (first lst)
+                            (second lst)))
+          (map-pair fn (rest (rest lst)))))  ; tico
+        )
+  )
 
-              
+(defun pair-up-substring-idxes (idxes)
+  (map-pair #'(lambda (l r)
+                (list l r))
+            idxes))
+
+
+
+      
+

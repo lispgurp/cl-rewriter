@@ -123,9 +123,26 @@
           lst-of-strs))
 
 (defun splice-lsts (lst-of-lst)
+  "reduce l = the result of the previous computation or the first element in the list
+          r = current element or the second element in the lst"
   (reduce #'(lambda (l r)
               (append l r))
           lst-of-lst))
+
+(defun mult-reduce (lst)
+  "list of numbers to play with reduce with"
+  (reduce #'maltiply
+          lst))
+
+(defun maltiply (&optional x y)
+  (if (and (null y) (null y)) 
+      nil
+      (* x y)))
+ 
+ 
+(defun my-append (x y)
+  (append x y))
+
 
 (defun test-if-semantics (x)
   "no else in this case"
@@ -135,4 +152,10 @@
   (when (eq x 1)
     (format t "we have one")))
 
+(defun count-pairs (lst)
+  "rudimentary pair counter using basic top down recusion"
+  (cond ((null lst) 0)
+        ((eq (length lst) 1) 0)
+        (t
+         (1+ (count-pairs (rest (rest lst)))))))
 					
